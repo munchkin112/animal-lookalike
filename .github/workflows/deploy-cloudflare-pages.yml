@@ -40,16 +40,27 @@ jobs:
           cat > wrangler.toml <<EOF
           name = "munchking"
           compatibility_date = "2026-05-27"
-          pages_build_output_dir = "."
+          pages_build_output_dir = "dist"
 
           [[kv_namespaces]]
           binding = "COMMENTS_KV"
           id = "${kv_id}"
           EOF
 
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build React app
+        run: npm run build
+
       - name: Deploy with Wrangler
         uses: cloudflare/wrangler-action@v3
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          command: pages deploy . --project-name=munchking --branch=main
+          command: pages deploy dist --project-name=munchking --branch=main

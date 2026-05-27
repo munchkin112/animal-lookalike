@@ -1,0 +1,522 @@
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { createRoot } from 'react-dom/client';
+import './styles.css';
+
+const KAKAO_APP_KEY = '975b1ff2408619d2ea5ba1e0734f720e';
+const SERVICE_URL = 'https://munchking.pages.dev/';
+const COMMENTS_API_URL = '/api/comments';
+const ANIMALS = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
+const MAX_KAKAO_IMAGE_SIZE = 5 * 1024 * 1024;
+
+function createRandomResult() {
+  const scores = ANIMALS.map((animal) => ({
+    animal,
+    score: Math.floor(Math.random() * 41) + 10
+  }));
+  const total = scores.reduce((sum, item) => sum + item.score, 0);
+  let percentTotal = 0;
+
+  return scores
+    .map((item, index) => {
+      const percent = index === scores.length - 1
+        ? 100 - percentTotal
+        : Math.round((item.score / total) * 100);
+      percentTotal += percent;
+      return { animal: item.animal, percent };
+    })
+    .sort((a, b) => b.percent - a.percent);
+}
+
+function getResultText(result) {
+  if (!result) {
+    return '아직 동물상 테스트 결과가 없어요.';
+  }
+
+  const lines = result.map((item) => `${item.animal} ${item.percent}%`);
+  return `나의 동물상 테스트 결과\n${lines.join('\n')}\n\n재미용 랜덤 테스트 결과입니다.`;
+}
+
+async function copyText(text) {
+  if (navigator.clipboard) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  const temp = document.createElement('textarea');
+  temp.value = text;
+  document.body.appendChild(temp);
+  temp.select();
+  document.execCommand('copy');
+  temp.remove();
+}
+
+async function loadComments() {
+  const response = await fetch(COMMENTS_API_URL, {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store'
+  });
+
+  if (!response.ok) {
+    throw new Error('댓글을 불러오지 못했습니다.');
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.comments) ? data.comments : [];
+}
+
+async function createComment(nickname, text) {
+  const response = await fetch(COMMENTS_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    },
+    body: JSON.stringify({ nickname, text })
+  });
+
+  if (!response.ok) {
+    throw new Error('댓글 등록에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.comments) ? data.comments : [];
+}
+
+function App() {
+  const fileInputRef = useRef(null);
+  const toastTimerRef = useRef(null);
+  const [selectedImageFile, setSelectedImageFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState('');
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [result, setResult] = useState(null);
+  const [comments, setComments] = useState([]);
+  const [commentsStatus, setCommentsStatus] = useState('loading');
+  const [nickname, setNickname] = useState('');
+  const [commentText, setCommentText] = useState('');
+  const [toast, setToast] = useState('');
+
+  const hasResult = Boolean(result);
+  const topResult = result?.[0];
+  const resultText = useMemo(() => getResultText(result), [result]);
+
+  const showToast = useCallback((message) => {
+    setToast(message);
+    window.clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = window.setTimeout(() => setToast(''), 2200);
+  }, []);
+
+  const refreshComments = useCallback(async (showMessage = false) => {
+    setCommentsStatus('loading');
+
+    try {
+      setComments(await loadComments());
+      setCommentsStatus('ready');
+      if (showMessage) {
+        showToast('댓글을 새로 불러왔어요.');
+      }
+    } catch (error) {
+      setCommentsStatus('error');
+    }
+  }, [showToast]);
+
+  useEffect(() => {
+    refreshComments();
+  }, [refreshComments]);
+
+  useEffect(() => () => {
+    if (previewUrl) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    window.clearTimeout(toastTimerRef.current);
+  }, [previewUrl]);
+
+  const handleImageFile = useCallback((file) => {
+    if (!file || !file.type.startsWith('image/')) {
+      showToast('이미지 파일만 업로드할 수 있어요.');
+      return;
+    }
+
+    setSelectedImageFile(file);
+    setPreviewUrl((currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(currentUrl);
+      }
+      return URL.createObjectURL(file);
+    });
+    setResult(null);
+    showToast('사진이 업로드됐어요.');
+  }, [showToast]);
+
+  const handleAnalyze = () => {
+    if (!previewUrl) {
+      showToast('먼저 사진을 업로드해주세요.');
+      return;
+    }
+
+    setResult(createRandomResult());
+    showToast('랜덤 동물상 결과가 나왔어요.');
+  };
+
+  const handleCopy = async () => {
+    await copyText(resultText);
+    showToast('결과를 복사했어요.');
+  };
+
+  const handleInstagramShare = async () => {
+    await handleCopy();
+    window.open('https://www.instagram.com/direct/inbox/', '_blank', 'noopener,noreferrer');
+    showToast('결과 복사 후 인스타그램 DM 화면을 열었어요.');
+  };
+
+  const getSelectedImageFiles = () => {
+    if (fileInputRef.current?.files?.length) {
+      return fileInputRef.current.files;
+    }
+
+    if (!selectedImageFile) {
+      return null;
+    }
+
+    try {
+      const dataTransfer = new DataTransfer();
+      dataTransfer.items.add(selectedImageFile);
+      return dataTransfer.files;
+    } catch (error) {
+      return [selectedImageFile];
+    }
+  };
+
+  const handleKakaoShare = async () => {
+    const hasKakaoKey = KAKAO_APP_KEY && KAKAO_APP_KEY !== '여기에_카카오_JavaScript_키';
+    const kakao = window.Kakao;
+
+    if (hasKakaoKey && kakao) {
+      try {
+        if (!kakao.isInitialized()) {
+          kakao.init(KAKAO_APP_KEY);
+        }
+
+        let uploadedImageUrl = '';
+        if (selectedImageFile) {
+          if (selectedImageFile.size > MAX_KAKAO_IMAGE_SIZE) {
+            showToast('카카오 공유 이미지는 5MB 이하만 가능해요.');
+          } else if (kakao.Share.uploadImage) {
+            showToast('사진을 카카오 공유용으로 준비 중이에요.');
+            const uploadResponse = await kakao.Share.uploadImage({
+              file: getSelectedImageFiles()
+            });
+            uploadedImageUrl = uploadResponse.infos.original.url;
+          }
+        }
+
+        if (uploadedImageUrl) {
+          kakao.Share.sendDefault({
+            objectType: 'feed',
+            content: {
+              title: '나의 동물상 테스트 결과',
+              description: resultText.replace(/\n/g, ' / '),
+              imageUrl: uploadedImageUrl,
+              link: {
+                mobileWebUrl: SERVICE_URL,
+                webUrl: SERVICE_URL
+              }
+            },
+            buttons: [
+              {
+                title: '테스트 하러 가기',
+                link: {
+                  mobileWebUrl: SERVICE_URL,
+                  webUrl: SERVICE_URL
+                }
+              }
+            ]
+          });
+        } else {
+          kakao.Share.sendDefault({
+            objectType: 'text',
+            text: `${resultText}\n\n나도 테스트하러 가기`,
+            link: {
+              mobileWebUrl: SERVICE_URL,
+              webUrl: SERVICE_URL
+            },
+            buttonTitle: '테스트 하러 가기'
+          });
+        }
+        return;
+      } catch (error) {
+        await handleCopy();
+        showToast('사진 공유에 실패해 결과를 복사했어요.');
+        return;
+      }
+    }
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: '동물상 테스트 결과',
+          text: resultText,
+          url: SERVICE_URL
+        });
+        return;
+      } catch (error) {
+        await handleCopy();
+        return;
+      }
+    }
+
+    await handleCopy();
+    showToast('카카오 키가 없어 결과 복사로 대신했어요.');
+  };
+
+  const handleCommentSubmit = async (event) => {
+    event.preventDefault();
+    const trimmedNickname = nickname.trim();
+    const trimmedText = commentText.trim();
+
+    if (!trimmedNickname || !trimmedText) {
+      showToast('닉네임과 댓글을 모두 입력해주세요.');
+      return;
+    }
+
+    try {
+      setComments(await createComment(trimmedNickname, trimmedText));
+      setCommentText('');
+      setCommentsStatus('ready');
+      showToast('댓글이 등록됐어요.');
+    } catch (error) {
+      showToast('댓글 저장소 연결을 확인해주세요.');
+    }
+  };
+
+  return (
+    <main className="page">
+      <div className="app-card">
+        <header className="hero">
+          <div className="badge">재미용 랜덤 테스트</div>
+          <h1>나는 어떤 동물상일까?</h1>
+          <p className="subtitle">
+            사진을 올리면 강아지상, 고양이상, 여우상, 토끼상, 곰상, 사슴상 중 랜덤으로 어울리는 분위기를 보여줘요.
+          </p>
+        </header>
+
+        <div className="content">
+          <ImageUploadSection
+            fileInputRef={fileInputRef}
+            isDragOver={isDragOver}
+            previewUrl={previewUrl}
+            onAnalyze={handleAnalyze}
+            onChangeImage={() => fileInputRef.current?.click()}
+            onDragOver={(event) => {
+              event.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={(event) => {
+              event.preventDefault();
+              setIsDragOver(false);
+              handleImageFile(event.dataTransfer.files[0]);
+            }}
+            onFileChange={(event) => handleImageFile(event.target.files[0])}
+          />
+
+          <ResultSection result={result} topResult={topResult} />
+
+          <ShareSection
+            disabled={!hasResult}
+            onCopy={handleCopy}
+            onInstagram={handleInstagramShare}
+            onKakao={handleKakaoShare}
+          />
+
+          <CommentSection
+            comments={comments}
+            status={commentsStatus}
+            nickname={nickname}
+            commentText={commentText}
+            onNicknameChange={setNickname}
+            onCommentTextChange={setCommentText}
+            onRefresh={() => refreshComments(true)}
+            onSubmit={handleCommentSubmit}
+          />
+        </div>
+      </div>
+      <Toast message={toast} />
+    </main>
+  );
+}
+
+function SectionTitle({ id, title, hint, children }) {
+  return (
+    <div className="section-title">
+      <h2 id={id}>{title}</h2>
+      {children || <span className="hint">{hint}</span>}
+    </div>
+  );
+}
+
+function ImageUploadSection({
+  fileInputRef,
+  isDragOver,
+  previewUrl,
+  onAnalyze,
+  onChangeImage,
+  onDragOver,
+  onDragLeave,
+  onDrop,
+  onFileChange
+}) {
+  return (
+    <section className="section" aria-labelledby="uploadTitle">
+      <SectionTitle id="uploadTitle" title="사진 업로드" hint="JPG, PNG, GIF 가능" />
+      <label
+        className={`upload-box${isDragOver ? ' drag-over' : ''}`}
+        htmlFor="imageInput"
+        onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
+        onDrop={onDrop}
+      >
+        <span className="upload-content">
+          <span className="upload-icon" aria-hidden="true">📷</span>
+          <strong>사진을 선택하거나 여기로 끌어오세요</strong>
+          <span className="upload-help">업로드한 사진은 이 브라우저 화면에서만 미리보기로 사용됩니다.</span>
+        </span>
+      </label>
+      <input
+        ref={fileInputRef}
+        className="file-input"
+        id="imageInput"
+        type="file"
+        accept="image/*"
+        onChange={onFileChange}
+      />
+
+      {previewUrl && (
+        <div className="preview-area">
+          <img className="preview-img" src={previewUrl} alt="업로드한 사진 미리보기" />
+          <div className="preview-copy">
+            <strong>사진 준비 완료</strong>
+            <p>아래 버튼을 누르면 랜덤 방식으로 동물상 퍼센트를 만들어드려요.</p>
+            <div className="actions">
+              <button className="btn btn-primary" type="button" onClick={onAnalyze}>결과 보기</button>
+              <button className="btn btn-ghost" type="button" onClick={onChangeImage}>사진 바꾸기</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ResultSection({ result, topResult }) {
+  return (
+    <section className="section" aria-labelledby="resultTitle">
+      <SectionTitle id="resultTitle" title="분석 결과" hint="랜덤 퍼센트" />
+
+      {!result && <p className="result-empty">사진을 업로드한 뒤 결과 보기를 눌러주세요.</p>}
+      {topResult && (
+        <div className="result-summary">
+          <strong>{topResult.animal} {topResult.percent}%</strong>
+          <p>오늘의 분위기는 {topResult.animal}! 실제 AI 분석이 아닌 재미용 랜덤 결과예요.</p>
+        </div>
+      )}
+      {result && (
+        <div className="result-list">
+          {result.map((item) => (
+            <div className="result-row" key={item.animal}>
+              <div className="result-label">
+                <span>{item.animal}</span>
+                <span>{item.percent}%</span>
+              </div>
+              <div className="bar" aria-hidden="true">
+                <div className="bar-fill" style={{ width: `${item.percent}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ShareSection({ disabled, onCopy, onInstagram, onKakao }) {
+  return (
+    <section className="section" aria-labelledby="shareTitle">
+      <SectionTitle id="shareTitle" title="공유하기" hint="결과 생성 후 사용 가능" />
+      <div className="share-grid">
+        <button className="btn btn-secondary" type="button" disabled={disabled} onClick={onCopy}>결과 복사</button>
+        <button className="btn btn-pink" type="button" disabled={disabled} onClick={onInstagram}>인스타그램 DM</button>
+        <button className="btn btn-blue" type="button" disabled={disabled} onClick={onKakao}>카카오톡 공유</button>
+      </div>
+    </section>
+  );
+}
+
+function CommentSection({
+  comments,
+  status,
+  nickname,
+  commentText,
+  onNicknameChange,
+  onCommentTextChange,
+  onRefresh,
+  onSubmit
+}) {
+  return (
+    <section className="section" aria-labelledby="commentTitle">
+      <SectionTitle id="commentTitle" title="댓글">
+        <button className="btn btn-ghost" type="button" onClick={onRefresh}>새로고침</button>
+      </SectionTitle>
+
+      <form className="comment-form" onSubmit={onSubmit}>
+        <input
+          className="field"
+          type="text"
+          maxLength="16"
+          placeholder="닉네임"
+          autoComplete="name"
+          value={nickname}
+          onChange={(event) => onNicknameChange(event.target.value)}
+        />
+        <textarea
+          className="field"
+          maxLength="180"
+          placeholder="댓글을 입력하세요"
+          value={commentText}
+          onChange={(event) => onCommentTextChange(event.target.value)}
+        />
+        <button className="btn btn-primary" type="submit">등록</button>
+      </form>
+
+      <div className="comment-list">
+        {status === 'loading' && <p className="empty-comments">댓글을 불러오는 중이에요.</p>}
+        {status === 'error' && <p className="empty-comments">공용 댓글 저장소 연결을 확인해주세요.</p>}
+        {status === 'ready' && comments.length === 0 && (
+          <p className="empty-comments">아직 댓글이 없어요. 첫 댓글을 남겨보세요.</p>
+        )}
+        {status === 'ready' && comments.map((comment) => (
+          <article className="comment-item" key={comment.id || `${comment.nickname}-${comment.date}`}>
+            <div className="comment-meta">
+              <span className="comment-name">{comment.nickname}</span>
+              <span>{comment.date}</span>
+            </div>
+            <p className="comment-text">{comment.text}</p>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function Toast({ message }) {
+  return (
+    <div className={`toast${message ? ' show' : ''}`} role="status" aria-live="polite">
+      {message}
+    </div>
+  );
+}
+
+createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
