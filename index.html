@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>동물상 테스트</title>
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.6/kakao.min.js" crossorigin="anonymous"></script>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg: #111318;
+      --panel: #1b2029;
+      --panel-soft: #242b36;
+      --line: rgba(255, 255, 255, 0.12);
+      --text: #f7f7fb;
+      --muted: #b7c0cf;
+      --accent: #ffca3a;
+      --accent-2: #52d1b8;
+      --pink: #ff6b9a;
+      --blue: #62a8ff;
+      --danger: #ff7676;
+      --shadow: 0 20px 70px rgba(0, 0, 0, 0.38);
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at 20% 0%, rgba(255, 202, 58, 0.16), transparent 30%),
+        radial-gradient(circle at 90% 20%, rgba(82, 209, 184, 0.14), transparent 32%),
+        linear-gradient(145deg, #101217 0%, #171b23 52%, #101217 100%);
+      color: var(--text);
+      padding: 28px 16px;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .page {
+      width: 100%;
+      max-width: 920px;
+      margin: 0 auto;
+    }
+
+    .app-card {
+      width: 100%;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(27, 32, 41, 0.92);
+      box-shadow: var(--shadow);
+    }
+
+    .hero {
+      padding: 34px 30px 28px;
+      border-bottom: 1px solid var(--line);
+      background: linear-gradient(135deg, rgba(255, 202, 58, 0.12), rgba(82, 209, 184, 0.08));
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: rgba(255, 202, 58, 0.14);
+      color: #ffdc70;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    h1 {
+      margin-bottom: 12px;
+      font-size: clamp(30px, 7vw, 52px);
+      line-height: 1.1;
+      letter-spacing: 0;
+      word-break: keep-all;
+    }
+
+    .subtitle {
+      max-width: 680px;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+      word-break: keep-all;
+    }
+
+    .content {
+      display: grid;
+      gap: 18px;
+      padding: 22px;
+    }
+
+    .section {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.045);
+      padding: 20px;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 20px;
+      line-height: 1.3;
+      letter-spacing: 0;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .upload-box {
+      display: flex;
+      width: 100%;
+      min-height: 190px;
+      align-items: center;
+      justify-content: center;
+      border: 2px dashed rgba(255, 255, 255, 0.25);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 22px;
+      text-align: center;
+      position: relative;
+      transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+    }
+
+    .upload-box:hover,
+    .upload-box.drag-over {
+      border-color: var(--accent);
+      background: rgba(255, 202, 58, 0.08);
+      transform: translateY(-1px);
+    }
+
+    .upload-icon {
+      display: flex;
+      width: 160px;
+      height: 160px;
+      align-items: center;
+      justify-content: center;
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      margin: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.12);
+      font-size: 118px;
+      line-height: 1;
+      pointer-events: none;
+      transform: translate(-50%, -50%);
+      z-index: 0;
+    }
+
+    .upload-box strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 19px;
+      position: relative;
+      word-break: keep-all;
+      z-index: 1;
+    }
+
+    .upload-help {
+      display: block;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.55;
+      position: relative;
+      word-break: keep-all;
+      z-index: 1;
+    }
+
+    .upload-content {
+      display: flex;
+      width: 100%;
+      min-height: 146px;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      text-align: center;
+    }
+
+    .upload-box .upload-icon {
+      color: rgba(255, 255, 255, 0.12);
+    }
+
+    #imageInput {
+      display: none;
+    }
+
+    .preview-area {
+      display: none;
+      grid-template-columns: 180px 1fr;
+      gap: 18px;
+      align-items: center;
+      margin-top: 16px;
+    }
+
+    .preview-img {
+      width: 180px;
+      aspect-ratio: 1 / 1;
+      object-fit: cover;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--panel-soft);
+    }
+
+    .preview-copy {
+      min-width: 0;
+    }
+
+    .preview-copy strong {
+      display: block;
+      margin-bottom: 8px;
+      font-size: 18px;
+    }
+
+    .preview-copy p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+      word-break: keep-all;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+      justify-content: center;
+    }
+
+    .btn {
+      display: inline-flex;
+      min-height: 44px;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      border-radius: 8px;
+      padding: 0 16px;
+      color: #101217;
+      font-weight: 800;
+      transition: transform 0.2s ease, filter 0.2s ease, opacity 0.2s ease;
+      white-space: nowrap;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.06);
+    }
+
+    .btn:disabled {
+      cursor: not-allowed;
+      opacity: 0.5;
+      transform: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+    }
+
+    .btn-secondary {
+      background: var(--accent-2);
+    }
+
+    .btn-pink {
+      background: var(--pink);
+      color: #fff;
+    }
+
+    .btn-blue {
+      background: var(--blue);
+      color: #07101e;
+    }
+
+    .btn-ghost {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+    }
+
+    .result-empty {
+      color: var(--muted);
+      line-height: 1.65;
+      word-break: keep-all;
+    }
+
+    .result-summary {
+      display: none;
+      margin-bottom: 16px;
+      padding: 16px;
+      border-radius: 8px;
+      background: rgba(255, 202, 58, 0.11);
+      border: 1px solid rgba(255, 202, 58, 0.2);
+    }
+
+    .result-summary strong {
+      display: block;
+      margin-bottom: 6px;
+      color: #ffdc70;
+      font-size: 22px;
+    }
+
+    .result-summary p {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .result-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .result-row {
+      display: grid;
+      gap: 8px;
+    }
+
+    .result-label {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 800;
+    }
+
+    .bar {
+      width: 100%;
+      height: 13px;
+      overflow: hidden;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.09);
+    }
+
+    .bar-fill {
+      width: 0%;
+      height: 100%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 0.55s ease;
+    }
+
+    .share-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .comment-form {
+      display: grid;
+      grid-template-columns: minmax(120px, 180px) 1fr auto;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .field {
+      width: 100%;
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      outline: none;
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text);
+      padding: 0 13px;
+    }
+
+    textarea.field {
+      min-height: 44px;
+      max-height: 140px;
+      resize: vertical;
+      padding-top: 11px;
+      line-height: 1.5;
+    }
+
+    .field::placeholder {
+      color: rgba(183, 192, 207, 0.68);
+    }
+
+    .comment-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .comment-item {
+      display: grid;
+      gap: 6px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      padding: 13px;
+    }
+
+    .comment-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .comment-name {
+      color: #ffdc70;
+      font-weight: 800;
+    }
+
+    .comment-text {
+      color: var(--text);
+      line-height: 1.55;
+      word-break: break-word;
+    }
+
+    .empty-comments {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 22px;
+      z-index: 10;
+      max-width: calc(100vw - 32px);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(11, 13, 18, 0.92);
+      color: var(--text);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.36);
+      padding: 12px 16px;
+      font-size: 14px;
+      opacity: 0;
+      pointer-events: none;
+      transform: translate(-50%, 14px);
+      transition: opacity 0.2s ease, transform 0.2s ease;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translate(-50%, 0);
+    }
+
+    @media (max-width: 760px) {
+      body {
+        padding: 14px;
+      }
+
+      .app-card {
+        border-radius: 8px;
+      }
+
+      .hero {
+        padding: 28px 20px 24px;
+      }
+
+      .content {
+        padding: 16px;
+      }
+
+      .section {
+        padding: 16px;
+        border-radius: 8px;
+      }
+
+      .preview-area {
+        grid-template-columns: 1fr;
+      }
+
+      .preview-img {
+        width: 100%;
+        max-height: 360px;
+        aspect-ratio: 4 / 3;
+      }
+
+      .share-grid,
+      .comment-form {
+        grid-template-columns: 1fr;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <div class="app-card">
+      <header class="hero">
+        <div class="badge">재미용 랜덤 테스트</div>
+        <h1>나는 어떤 동물상일까?</h1>
+        <p class="subtitle">
+          사진을 올리면 강아지상, 고양이상, 여우상, 토끼상, 곰상, 사슴상 중
+          랜덤으로 어울리는 분위기를 보여줘요. 실제 AI 얼굴 분석이 아닌 가벼운 재미용 테스트입니다.
+        </p>
+      </header>
+
+      <div class="content">
+        <section class="section" aria-labelledby="uploadTitle">
+          <div class="section-title">
+            <h2 id="uploadTitle">사진 업로드</h2>
+            <span class="hint">JPG, PNG, GIF 가능</span>
+          </div>
+
+          <label class="upload-box" id="uploadBox" for="imageInput">
+            <span class="upload-content">
+              <span class="upload-icon">📷</span>
+              <strong>사진을 선택하거나 여기로 끌어오세요</strong>
+              <span class="upload-help">업로드한 사진은 이 브라우저 화면에서만 미리보기로 사용됩니다.</span>
+            </span>
+          </label>
+          <input id="imageInput" type="file" accept="image/*" />
+
+          <div class="preview-area" id="previewArea">
+            <img class="preview-img" id="previewImage" alt="업로드한 사진 미리보기" />
+            <div class="preview-copy">
+              <strong>사진 준비 완료</strong>
+              <p>아래 버튼을 누르면 랜덤 방식으로 동물상 퍼센트를 만들어드려요.</p>
+              <div class="actions">
+                <button class="btn btn-primary" id="analyzeButton" type="button">결과 보기</button>
+                <button class="btn btn-ghost" id="changeImageButton" type="button">사진 바꾸기</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="resultTitle">
+          <div class="section-title">
+            <h2 id="resultTitle">분석 결과</h2>
+            <span class="hint">랜덤 퍼센트</span>
+          </div>
+
+          <p class="result-empty" id="resultEmpty">사진을 업로드한 뒤 결과 보기를 눌러주세요.</p>
+          <div class="result-summary" id="resultSummary"></div>
+          <div class="result-list" id="resultList"></div>
+        </section>
+
+        <section class="section" aria-labelledby="shareTitle">
+          <div class="section-title">
+            <h2 id="shareTitle">공유하기</h2>
+            <span class="hint">결과 생성 후 사용 가능</span>
+          </div>
+
+          <div class="share-grid">
+            <button class="btn btn-secondary" id="copyButton" type="button" disabled>결과 복사</button>
+            <button class="btn btn-pink" id="instagramButton" type="button" disabled>인스타그램 DM</button>
+            <button class="btn btn-blue" id="kakaoButton" type="button" disabled>카카오톡 공유</button>
+          </div>
+        </section>
+
+        <section class="section" aria-labelledby="commentTitle">
+          <div class="section-title">
+            <h2 id="commentTitle">댓글</h2>
+            <button class="btn btn-ghost" id="clearCommentsButton" type="button">댓글 비우기</button>
+          </div>
+
+          <form class="comment-form" id="commentForm">
+            <input class="field" id="nicknameInput" type="text" maxlength="16" placeholder="닉네임" autocomplete="name" />
+            <textarea class="field" id="commentInput" maxlength="180" placeholder="댓글을 입력하세요"></textarea>
+            <button class="btn btn-primary" type="submit">등록</button>
+          </form>
+
+          <div class="comment-list" id="commentList"></div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const KAKAO_APP_KEY = '여기에_카카오_JavaScript_키';
+
+    const animals = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
+    const commentsStorageKey = 'animalFaceTestComments';
+
+    const imageInput = document.getElementById('imageInput');
+    const uploadBox = document.getElementById('uploadBox');
+    const previewArea = document.getElementById('previewArea');
+    const previewImage = document.getElementById('previewImage');
+    const analyzeButton = document.getElementById('analyzeButton');
+    const changeImageButton = document.getElementById('changeImageButton');
+    const resultEmpty = document.getElementById('resultEmpty');
+    const resultSummary = document.getElementById('resultSummary');
+    const resultList = document.getElementById('resultList');
+    const copyButton = document.getElementById('copyButton');
+    const instagramButton = document.getElementById('instagramButton');
+    const kakaoButton = document.getElementById('kakaoButton');
+    const commentForm = document.getElementById('commentForm');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const commentInput = document.getElementById('commentInput');
+    const commentList = document.getElementById('commentList');
+    const clearCommentsButton = document.getElementById('clearCommentsButton');
+    const toast = document.getElementById('toast');
+
+    let currentResult = null;
+    let toastTimer = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        toast.classList.remove('show');
+      }, 2200);
+    }
+
+    function handleImageFile(file) {
+      if (!file || !file.type.startsWith('image/')) {
+        showToast('이미지 파일만 업로드할 수 있어요.');
+        return;
+      }
+
+      const imageUrl = URL.createObjectURL(file);
+      previewImage.src = imageUrl;
+      previewArea.style.display = 'grid';
+      resultEmpty.style.display = 'block';
+      resultSummary.style.display = 'none';
+      resultSummary.innerHTML = '';
+      resultList.innerHTML = '';
+      currentResult = null;
+      setShareButtons(false);
+      showToast('사진이 업로드됐어요.');
+    }
+
+    function setShareButtons(enabled) {
+      copyButton.disabled = !enabled;
+      instagramButton.disabled = !enabled;
+      kakaoButton.disabled = !enabled;
+    }
+
+    function createRandomResult() {
+      const scores = animals.map((animal) => ({
+        animal,
+        score: Math.floor(Math.random() * 41) + 10
+      }));
+
+      const total = scores.reduce((sum, item) => sum + item.score, 0);
+      let percentTotal = 0;
+      const result = scores.map((item, index) => {
+        const percent = index === scores.length - 1
+          ? 100 - percentTotal
+          : Math.round((item.score / total) * 100);
+        percentTotal += percent;
+        return { animal: item.animal, percent };
+      });
+
+      return result.sort((a, b) => b.percent - a.percent);
+    }
+
+    function renderResult(result) {
+      const top = result[0];
+      resultEmpty.style.display = 'none';
+      resultSummary.style.display = 'block';
+      resultSummary.innerHTML = `
+        <strong>${top.animal} ${top.percent}%</strong>
+        <p>오늘의 분위기는 ${top.animal}! 실제 AI 분석이 아닌 재미용 랜덤 결과예요.</p>
+      `;
+
+      resultList.innerHTML = result.map((item) => `
+        <div class="result-row">
+          <div class="result-label">
+            <span>${item.animal}</span>
+            <span>${item.percent}%</span>
+          </div>
+          <div class="bar" aria-hidden="true">
+            <div class="bar-fill" style="width: ${item.percent}%"></div>
+          </div>
+        </div>
+      `).join('');
+    }
+
+    function getResultText() {
+      if (!currentResult) {
+        return '아직 동물상 테스트 결과가 없어요.';
+      }
+
+      const lines = currentResult.map((item) => `${item.animal} ${item.percent}%`);
+      return `나의 동물상 테스트 결과\n${lines.join('\n')}\n\n재미용 랜덤 테스트 결과입니다.`;
+    }
+
+    async function copyResult() {
+      const text = getResultText();
+
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('결과를 복사했어요.');
+      } catch (error) {
+        const temp = document.createElement('textarea');
+        temp.value = text;
+        document.body.appendChild(temp);
+        temp.select();
+        document.execCommand('copy');
+        temp.remove();
+        showToast('결과를 복사했어요.');
+      }
+    }
+
+    async function shareInstagram() {
+      await copyResult();
+      window.open('https://www.instagram.com/direct/inbox/', '_blank', 'noopener,noreferrer');
+      showToast('결과 복사 후 인스타그램 DM 화면을 열었어요.');
+    }
+
+    async function shareKakao() {
+      const text = getResultText();
+      const pageUrl = window.location.href;
+      const hasKakaoKey = KAKAO_APP_KEY && KAKAO_APP_KEY !== '여기에_카카오_JavaScript_키';
+
+      if (hasKakaoKey && window.Kakao) {
+        if (!Kakao.isInitialized()) {
+          Kakao.init(KAKAO_APP_KEY);
+        }
+
+        Kakao.Share.sendDefault({
+          objectType: 'feed',
+          content: {
+            title: '나의 동물상 테스트 결과',
+            description: text.replace(/\n/g, ' / '),
+            imageUrl: 'https://dummyimage.com/800x400/1b2029/ffca3a&text=Animal+Face+Test',
+            link: {
+              mobileWebUrl: pageUrl,
+              webUrl: pageUrl
+            }
+          },
+          buttons: [
+            {
+              title: '테스트 하러 가기',
+              link: {
+                mobileWebUrl: pageUrl,
+                webUrl: pageUrl
+              }
+            }
+          ]
+        });
+        return;
+      }
+
+      if (navigator.share) {
+        try {
+          await navigator.share({
+            title: '동물상 테스트 결과',
+            text,
+            url: pageUrl
+          });
+          return;
+        } catch (error) {
+          await copyResult();
+          return;
+        }
+      }
+
+      await copyResult();
+      showToast('카카오 키가 없어 결과 복사로 대신했어요.');
+    }
+
+    function loadComments() {
+      try {
+        return JSON.parse(localStorage.getItem(commentsStorageKey)) || [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveComments(comments) {
+      localStorage.setItem(commentsStorageKey, JSON.stringify(comments));
+    }
+
+    function renderComments() {
+      const comments = loadComments();
+
+      if (comments.length === 0) {
+        commentList.innerHTML = '<p class="empty-comments">아직 댓글이 없어요. 첫 댓글을 남겨보세요.</p>';
+        return;
+      }
+
+      commentList.innerHTML = comments.map((comment) => `
+        <article class="comment-item">
+          <div class="comment-meta">
+            <span class="comment-name">${escapeHtml(comment.nickname)}</span>
+            <span>${comment.date}</span>
+          </div>
+          <p class="comment-text">${escapeHtml(comment.text)}</p>
+        </article>
+      `).join('');
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#039;');
+    }
+
+    imageInput.addEventListener('change', (event) => {
+      handleImageFile(event.target.files[0]);
+    });
+
+    uploadBox.addEventListener('dragover', (event) => {
+      event.preventDefault();
+      uploadBox.classList.add('drag-over');
+    });
+
+    uploadBox.addEventListener('dragleave', () => {
+      uploadBox.classList.remove('drag-over');
+    });
+
+    uploadBox.addEventListener('drop', (event) => {
+      event.preventDefault();
+      uploadBox.classList.remove('drag-over');
+      handleImageFile(event.dataTransfer.files[0]);
+    });
+
+    changeImageButton.addEventListener('click', () => {
+      imageInput.click();
+    });
+
+    analyzeButton.addEventListener('click', () => {
+      if (!previewImage.src) {
+        showToast('먼저 사진을 업로드해주세요.');
+        return;
+      }
+
+      currentResult = createRandomResult();
+      renderResult(currentResult);
+      setShareButtons(true);
+      showToast('랜덤 동물상 결과가 나왔어요.');
+    });
+
+    copyButton.addEventListener('click', copyResult);
+    instagramButton.addEventListener('click', shareInstagram);
+    kakaoButton.addEventListener('click', shareKakao);
+
+    commentForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+
+      const nickname = nicknameInput.value.trim();
+      const text = commentInput.value.trim();
+
+      if (!nickname || !text) {
+        showToast('닉네임과 댓글을 모두 입력해주세요.');
+        return;
+      }
+
+      const comments = loadComments();
+      comments.unshift({
+        nickname,
+        text,
+        date: new Date().toLocaleString('ko-KR', {
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit'
+        })
+      });
+
+      saveComments(comments);
+      commentInput.value = '';
+      renderComments();
+      showToast('댓글이 등록됐어요.');
+    });
+
+    clearCommentsButton.addEventListener('click', () => {
+      if (!confirm('저장된 댓글을 모두 지울까요?')) {
+        return;
+      }
+
+      saveComments([]);
+      renderComments();
+      showToast('댓글을 모두 지웠어요.');
+    });
+
+    renderComments();
+  </script>
+</body>
+</html>
