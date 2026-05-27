@@ -596,6 +596,7 @@
 
   <script>
     const KAKAO_APP_KEY = '975b1ff2408619d2ea5ba1e0734f720e';
+    const SERVICE_URL = 'https://munchking.pages.dev/';
 
     const animals = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
     const commentsStorageKey = 'animalFaceTestComments';
@@ -730,36 +731,30 @@
 
     async function shareKakao() {
       const text = getResultText();
-      const pageUrl = window.location.href;
+      const pageUrl = SERVICE_URL;
       const hasKakaoKey = KAKAO_APP_KEY && KAKAO_APP_KEY !== '여기에_카카오_JavaScript_키';
 
       if (hasKakaoKey && window.Kakao) {
-        if (!Kakao.isInitialized()) {
-          Kakao.init(KAKAO_APP_KEY);
-        }
+        try {
+          if (!Kakao.isInitialized()) {
+            Kakao.init(KAKAO_APP_KEY);
+          }
 
-        Kakao.Share.sendDefault({
-          objectType: 'feed',
-          content: {
-            title: '나의 동물상 테스트 결과',
-            description: text.replace(/\n/g, ' / '),
-            imageUrl: 'https://dummyimage.com/800x400/1b2029/ffca3a&text=Animal+Face+Test',
+          Kakao.Share.sendDefault({
+            objectType: 'text',
+            text: `${text}\n\n나도 테스트하러 가기`,
             link: {
               mobileWebUrl: pageUrl,
               webUrl: pageUrl
-            }
-          },
-          buttons: [
-            {
-              title: '테스트 하러 가기',
-              link: {
-                mobileWebUrl: pageUrl,
-                webUrl: pageUrl
-              }
-            }
-          ]
-        });
-        return;
+            },
+            buttonTitle: '테스트 하러 가기'
+          });
+          return;
+        } catch (error) {
+          await copyResult();
+          showToast('카카오 공유 설정을 확인해주세요. 결과는 복사했어요.');
+          return;
+        }
       }
 
       if (navigator.share) {
