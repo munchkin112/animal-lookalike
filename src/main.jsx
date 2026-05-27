@@ -8,6 +8,11 @@ const SERVICE_URL = 'https://munchking.pages.dev/';
 const COMMENTS_API_URL = '/api/comments';
 const ANIMALS = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
 const MAX_KAKAO_IMAGE_SIZE = 5 * 1024 * 1024;
+const ANALYSIS_MESSAGES = [
+  '얼굴 분위기를 살펴보는 중...',
+  '동물상 후보를 비교하는 중...',
+  '가장 어울리는 동물상을 찾는 중...'
+];
 const ANIMAL_META = {
   강아지상: {
     emoji: '🐶',
@@ -111,11 +116,15 @@ async function createComment(nickname, text) {
 
 function App() {
   const fileInputRef = useRef(null);
+  const resultSectionRef = useRef(null);
   const resultCardRef = useRef(null);
   const toastTimerRef = useRef(null);
+  const analyzeTimerRef = useRef(null);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisMessage, setAnalysisMessage] = useState('');
   const [result, setResult] = useState(null);
   const [comments, setComments] = useState([]);
   const [commentsStatus, setCommentsStatus] = useState('loading');
@@ -157,6 +166,7 @@ function App() {
       URL.revokeObjectURL(previewUrl);
     }
     window.clearTimeout(toastTimerRef.current);
+    window.clearTimeout(analyzeTimerRef.current);
   }, [previewUrl]);
 
   const handleImageFile = useCallback((file) => {
@@ -173,17 +183,44 @@ function App() {
       return URL.createObjectURL(file);
     });
     setResult(null);
+    setIsAnalyzing(false);
+    window.clearTimeout(analyzeTimerRef.current);
     showToast('사진이 업로드됐어요.');
   }, [showToast]);
 
-  const handleAnalyze = () => {
+  const handleAnalyze = useCallback(() => {
+    if (!previewUrl || isAnalyzing) {
+      if (!previewUrl) {
+        showToast('먼저 사진을 업로드해주세요.');
+      }
+      return;
+    }
+
+    setResult(null);
+    setIsAnalyzing(true);
+    setAnalysisMessage(ANALYSIS_MESSAGES[Math.floor(Math.random() * ANALYSIS_MESSAGES.length)]);
+
+    analyzeTimerRef.current = window.setTimeout(() => {
+      setResult(createRandomResult());
+      setIsAnalyzing(false);
+      showToast('랜덤 동물상 결과가 나왔어요.');
+    }, 1200);
+  }, [isAnalyzing, previewUrl, showToast]);
+
+  useEffect(() => {
+    if (result) {
+      window.setTimeout(() => {
+        resultSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 80);
+    }
+  }, [result]);
+
+  const handleRetest = () => {
     if (!previewUrl) {
       showToast('먼저 사진을 업로드해주세요.');
       return;
     }
-
-    setResult(createRandomResult());
-    showToast('랜덤 동물상 결과가 나왔어요.');
+    handleAnalyze();
   };
 
   const handleCopy = async () => {
@@ -365,6 +402,7 @@ function App() {
           <ImageUploadSection
             fileInputRef={fileInputRef}
             isDragOver={isDragOver}
+            isAnalyzing={isAnalyzing}
             previewUrl={previewUrl}
             onAnalyze={handleAnalyze}
             onChangeImage={() => fileInputRef.current?.click()}
@@ -381,11 +419,19 @@ function App() {
             onFileChange={(event) => handleImageFile(event.target.files[0])}
           />
 
-          <ResultSection result={result} topResult={topResult} />
+          <ResultSection
+            ref={resultSectionRef}
+            isAnalyzing={isAnalyzing}
+            analysisMessage={analysisMessage}
+            result={result}
+            topResult={topResult}
+            onRetest={handleRetest}
+          />
 
           <ShareSection
             disabled={!hasResult}
             isSavingImage={isSavingImage}
+            hasResult={hasResult}
             onSaveImage={handleSaveResultImage}
             onCopy={handleCopy}
             onInstagram={handleInstagramShare}
@@ -422,6 +468,7 @@ function SectionTitle({ id, title, hint, children }) {
 function ImageUploadSection({
   fileInputRef,
   isDragOver,
+  isAnalyzing,
   previewUrl,
   onAnalyze,
   onChangeImage,
@@ -456,32 +503,63 @@ function ImageUploadSection({
       />
 
       {previewUrl && (
-        <div className="preview-area">
-          <img className="preview-img" src={previewUrl} alt="업로드한 사진 미리보기" />
-          <div className="preview-copy">
-            <strong>사진 준비 완료</strong>
-            <p>아래 버튼을 누르면 랜덤 방식으로 동물상 퍼센트를 만들어드려요.</p>
-            <div className="actions">
-              <button className="btn btn-primary" type="button" onClick={onAnalyze}>결과 보기</button>
-              <button className="btn btn-ghost" type="button" onClick={onChangeImage}>사진 바꾸기</button>
+        <>
+          <div className="preview-area">
+            <img className="preview-img" src={previewUrl} alt="업로드한 사진 미리보기" />
+            <div className="preview-copy">
+              <strong>사진 준비 완료</strong>
+              <p>아래 버튼을 누르면 랜덤 방식으로 동물상 퍼센트를 만들어드려요.</p>
+              <div className="actions">
+                <button className="btn btn-ghost" type="button" onClick={onChangeImage}>사진 바꾸기</button>
+              </div>
             </div>
           </div>
-        </div>
+          <div className="preview-cta">
+            <button
+              className="btn cta-analyze"
+              type="button"
+              disabled={isAnalyzing}
+              onClick={onAnalyze}
+            >
+              {isAnalyzing ? '분석 중...' : '내 동물상 결과 보기'}
+            </button>
+            <p className="cta-helper">업로드한 사진은 브라우저 화면에서만 미리보기로 사용됩니다.</p>
+          </div>
+        </>
       )}
     </section>
   );
 }
 
-function ResultSection({ result, topResult }) {
+const ResultSection = React.forwardRef(function ResultSection(
+  { isAnalyzing, analysisMessage, result, topResult, onRetest },
+  ref
+) {
   return (
-    <section className="section" aria-labelledby="resultTitle">
+    <section ref={ref} className="section" aria-labelledby="resultTitle">
       <SectionTitle id="resultTitle" title="분석 결과" hint="랜덤 퍼센트" />
 
-      {!result && <p className="result-empty">사진을 업로드한 뒤 결과 보기를 눌러주세요.</p>}
+      {!result && !isAnalyzing && <p className="result-empty">사진을 업로드한 뒤 결과 보기를 눌러주세요.</p>}
+      {isAnalyzing && (
+        <div className="analysis-loading" aria-live="polite">
+          <div className="loading-dots" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+          <strong>{analysisMessage}</strong>
+          <div className="skeleton-lines" aria-hidden="true">
+            <span />
+            <span />
+            <span />
+          </div>
+        </div>
+      )}
       {topResult && (
         <div className="result-summary">
+          <span className="result-ready-label">사진 준비 완료</span>
           <strong>{topResult.animal} {topResult.percent}%</strong>
-          <p>오늘의 분위기는 {topResult.animal}! 실제 AI 분석이 아닌 재미용 랜덤 결과예요.</p>
+          <p>재미로 보는 분위기 분석 결과예요.</p>
         </div>
       )}
       {result && (
@@ -499,14 +577,23 @@ function ResultSection({ result, topResult }) {
           ))}
         </div>
       )}
+      {result && (
+        <button className="btn btn-retest" type="button" onClick={onRetest}>
+          다시 테스트하기
+        </button>
+      )}
     </section>
   );
-}
+});
 
-function ShareSection({ disabled, isSavingImage, onSaveImage, onCopy, onInstagram, onKakao }) {
+function ShareSection({ disabled, isSavingImage, hasResult, onSaveImage, onCopy, onInstagram, onKakao }) {
   return (
     <section className="section" aria-labelledby="shareTitle">
-      <SectionTitle id="shareTitle" title="공유하기" hint="결과 생성 후 사용 가능" />
+      <SectionTitle
+        id="shareTitle"
+        title="공유하기"
+        hint={hasResult ? '친구에게 결과를 공유해보세요' : '결과 생성 후 사용 가능'}
+      />
       <button
         className="btn btn-save-image"
         type="button"
