@@ -548,6 +548,28 @@ textarea.field {
   word-break: break-word;
 }
 
+.comment-delete {
+  width: fit-content;
+  min-height: 34px;
+  justify-self: end;
+  border: 1px solid rgba(255, 118, 118, 0.28);
+  border-radius: 8px;
+  background: rgba(255, 118, 118, 0.1);
+  color: #ffb4b4;
+  font-size: 13px;
+  font-weight: 800;
+  padding: 0 12px;
+}
+
+.comment-delete:hover {
+  background: rgba(255, 118, 118, 0.17);
+}
+
+.comment-delete:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
 .empty-comments {
   color: var(--muted);
   font-size: 14px;

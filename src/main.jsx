@@ -6,6 +6,8 @@ import './styles.css';
 const KAKAO_APP_KEY = '975b1ff2408619d2ea5ba1e0734f720e';
 const SERVICE_URL = 'https://munchking.pages.dev/';
 const COMMENTS_API_URL = '/api/comments';
+const COMMENT_OWNER_TOKEN_KEY = 'animalFaceCommentOwnerToken';
+const MY_COMMENT_IDS_KEY = 'animalFaceMyCommentIds';
 const ANIMALS = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
 const MAX_KAKAO_IMAGE_SIZE = 5 * 1024 * 1024;
 const ANALYSIS_MESSAGES = [
@@ -96,18 +98,59 @@ async function loadComments() {
   return Array.isArray(data.comments) ? data.comments : [];
 }
 
-async function createComment(nickname, text) {
+function getCommentOwnerToken() {
+  const savedToken = localStorage.getItem(COMMENT_OWNER_TOKEN_KEY);
+  if (savedToken) {
+    return savedToken;
+  }
+
+  const token = crypto.randomUUID();
+  localStorage.setItem(COMMENT_OWNER_TOKEN_KEY, token);
+  return token;
+}
+
+function getMyCommentIds() {
+  try {
+    const savedIds = JSON.parse(localStorage.getItem(MY_COMMENT_IDS_KEY));
+    return Array.isArray(savedIds) ? savedIds : [];
+  } catch (error) {
+    return [];
+  }
+}
+
+function saveMyCommentIds(ids) {
+  localStorage.setItem(MY_COMMENT_IDS_KEY, JSON.stringify([...new Set(ids)]));
+}
+
+async function createComment(nickname, text, ownerToken) {
   const response = await fetch(COMMENTS_API_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json'
     },
-    body: JSON.stringify({ nickname, text })
+    body: JSON.stringify({ nickname, text, ownerToken })
   });
 
   if (!response.ok) {
     throw new Error('댓글 등록에 실패했습니다.');
+  }
+
+  const data = await response.json();
+  return Array.isArray(data.comments) ? data.comments : [];
+}
+
+async function deleteComment(commentId, ownerToken) {
+  const response = await fetch(`${COMMENTS_API_URL}?id=${encodeURIComponent(commentId)}`, {
+    method: 'DELETE',
+    headers: {
+      Accept: 'application/json',
+      'x-comment-owner-token': ownerToken
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error('댓글 삭제에 실패했습니다.');
   }
 
   const data = await response.json();
@@ -127,6 +170,8 @@ function App() {
   const [analysisMessage, setAnalysisMessage] = useState('');
   const [result, setResult] = useState(null);
   const [comments, setComments] = useState([]);
+  const [myCommentIds, setMyCommentIds] = useState(() => getMyCommentIds());
+  const [deletingCommentId, setDeletingCommentId] = useState('');
   const [commentsStatus, setCommentsStatus] = useState('loading');
   const [nickname, setNickname] = useState('');
   const [commentText, setCommentText] = useState('');
@@ -378,12 +423,41 @@ function App() {
     }
 
     try {
-      setComments(await createComment(trimmedNickname, trimmedText));
+      const nextComments = await createComment(trimmedNickname, trimmedText, getCommentOwnerToken());
+      const createdComment = nextComments.find((comment) => (
+        comment.nickname === trimmedNickname && comment.text === trimmedText
+      ));
+      if (createdComment?.id) {
+        const nextIds = [createdComment.id, ...myCommentIds];
+        setMyCommentIds(nextIds);
+        saveMyCommentIds(nextIds);
+      }
+      setComments(nextComments);
       setCommentText('');
       setCommentsStatus('ready');
       showToast('댓글이 등록됐어요.');
     } catch (error) {
       showToast('댓글 저장소 연결을 확인해주세요.');
+    }
+  };
+
+  const handleDeleteComment = async (commentId) => {
+    if (!commentId || deletingCommentId) {
+      return;
+    }
+
+    setDeletingCommentId(commentId);
+
+    try {
+      setComments(await deleteComment(commentId, getCommentOwnerToken()));
+      const nextIds = myCommentIds.filter((id) => id !== commentId);
+      setMyCommentIds(nextIds);
+      saveMyCommentIds(nextIds);
+      showToast('댓글을 삭제했어요.');
+    } catch (error) {
+      showToast('내가 작성한 댓글만 삭제할 수 있어요.');
+    } finally {
+      setDeletingCommentId('');
     }
   };
 
@@ -441,12 +515,15 @@ function App() {
           <CommentSection
             comments={comments}
             status={commentsStatus}
+            myCommentIds={myCommentIds}
+            deletingCommentId={deletingCommentId}
             nickname={nickname}
             commentText={commentText}
             onNicknameChange={setNickname}
             onCommentTextChange={setCommentText}
             onRefresh={() => refreshComments(true)}
             onSubmit={handleCommentSubmit}
+            onDelete={handleDeleteComment}
           />
         </div>
       </div>
@@ -657,12 +734,15 @@ const ResultImageCard = React.forwardRef(function ResultImageCard({ result, topR
 function CommentSection({
   comments,
   status,
+  myCommentIds,
+  deletingCommentId,
   nickname,
   commentText,
   onNicknameChange,
   onCommentTextChange,
   onRefresh,
-  onSubmit
+  onSubmit,
+  onDelete
 }) {
   return (
     <section className="section" aria-labelledby="commentTitle">
@@ -703,6 +783,16 @@ function CommentSection({
               <span>{comment.date}</span>
             </div>
             <p className="comment-text">{comment.text}</p>
+            {myCommentIds.includes(comment.id) && (
+              <button
+                className="comment-delete"
+                type="button"
+                disabled={deletingCommentId === comment.id}
+                onClick={() => onDelete(comment.id)}
+              >
+                {deletingCommentId === comment.id ? '삭제 중...' : '삭제'}
+              </button>
+            )}
           </article>
         ))}
       </div>
