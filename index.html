@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>동물상 테스트</title>
-  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.7.6/kakao.min.js" crossorigin="anonymous"></script>
+  <script src="https://t1.kakaocdn.net/kakao_js_sdk/2.8.1/kakao.min.js" crossorigin="anonymous"></script>
   <style>
     * {
       box-sizing: border-box;
@@ -633,6 +633,7 @@
     const toast = document.getElementById('toast');
 
     let currentResult = null;
+    let selectedImageFile = null;
     let toastTimer = null;
 
     function showToast(message) {
@@ -650,6 +651,7 @@
         return;
       }
 
+      selectedImageFile = file;
       const imageUrl = URL.createObjectURL(file);
       previewImage.src = imageUrl;
       previewArea.style.display = 'grid';
@@ -741,6 +743,24 @@
       showToast('결과 복사 후 인스타그램 DM 화면을 열었어요.');
     }
 
+    function getSelectedImageFiles() {
+      if (imageInput.files && imageInput.files.length > 0) {
+        return imageInput.files;
+      }
+
+      if (!selectedImageFile) {
+        return null;
+      }
+
+      try {
+        const dataTransfer = new DataTransfer();
+        dataTransfer.items.add(selectedImageFile);
+        return dataTransfer.files;
+      } catch (error) {
+        return [selectedImageFile];
+      }
+    }
+
     async function shareKakao() {
       const text = getResultText();
       const pageUrl = SERVICE_URL;
@@ -752,19 +772,57 @@
             Kakao.init(KAKAO_APP_KEY);
           }
 
-          Kakao.Share.sendDefault({
-            objectType: 'text',
-            text: `${text}\n\n나도 테스트하러 가기`,
-            link: {
-              mobileWebUrl: pageUrl,
-              webUrl: pageUrl
-            },
-            buttonTitle: '테스트 하러 가기'
-          });
+          let uploadedImageUrl = '';
+
+          if (selectedImageFile) {
+            if (selectedImageFile.size > 5 * 1024 * 1024) {
+              showToast('카카오 공유 이미지는 5MB 이하만 가능해요.');
+            } else if (Kakao.Share.uploadImage) {
+              showToast('사진을 카카오 공유용으로 준비 중이에요.');
+              const uploadResponse = await Kakao.Share.uploadImage({
+                file: getSelectedImageFiles()
+              });
+              uploadedImageUrl = uploadResponse.infos.original.url;
+            }
+          }
+
+          if (uploadedImageUrl) {
+            Kakao.Share.sendDefault({
+              objectType: 'feed',
+              content: {
+                title: '나의 동물상 테스트 결과',
+                description: text.replace(/\n/g, ' / '),
+                imageUrl: uploadedImageUrl,
+                link: {
+                  mobileWebUrl: pageUrl,
+                  webUrl: pageUrl
+                }
+              },
+              buttons: [
+                {
+                  title: '테스트 하러 가기',
+                  link: {
+                    mobileWebUrl: pageUrl,
+                    webUrl: pageUrl
+                  }
+                }
+              ]
+            });
+          } else {
+            Kakao.Share.sendDefault({
+              objectType: 'text',
+              text: `${text}\n\n나도 테스트하러 가기`,
+              link: {
+                mobileWebUrl: pageUrl,
+                webUrl: pageUrl
+              },
+              buttonTitle: '테스트 하러 가기'
+            });
+          }
           return;
         } catch (error) {
           await copyResult();
-          showToast('카카오 공유 설정을 확인해주세요. 결과는 복사했어요.');
+          showToast('사진 공유에 실패해 결과를 복사했어요.');
           return;
         }
       }
