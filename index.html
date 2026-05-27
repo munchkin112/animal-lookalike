@@ -577,7 +577,7 @@
         <section class="section" aria-labelledby="commentTitle">
           <div class="section-title">
             <h2 id="commentTitle">댓글</h2>
-            <button class="btn btn-ghost" id="clearCommentsButton" type="button">댓글 비우기</button>
+            <button class="btn btn-ghost" id="refreshCommentsButton" type="button">새로고침</button>
           </div>
 
           <form class="comment-form" id="commentForm">
@@ -599,7 +599,7 @@
     const SERVICE_URL = 'https://munchking.pages.dev/';
 
     const animals = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
-    const commentsStorageKey = 'animalFaceTestComments';
+    const commentsApiUrl = '/api/comments';
 
     const imageInput = document.getElementById('imageInput');
     const uploadBox = document.getElementById('uploadBox');
@@ -617,7 +617,7 @@
     const nicknameInput = document.getElementById('nicknameInput');
     const commentInput = document.getElementById('commentInput');
     const commentList = document.getElementById('commentList');
-    const clearCommentsButton = document.getElementById('clearCommentsButton');
+    const refreshCommentsButton = document.getElementById('refreshCommentsButton');
     const toast = document.getElementById('toast');
 
     let currentResult = null;
@@ -775,20 +775,39 @@
       showToast('카카오 키가 없어 결과 복사로 대신했어요.');
     }
 
-    function loadComments() {
-      try {
-        return JSON.parse(localStorage.getItem(commentsStorageKey)) || [];
-      } catch (error) {
-        return [];
+    async function loadComments() {
+      const response = await fetch(commentsApiUrl, {
+        headers: { Accept: 'application/json' },
+        cache: 'no-store'
+      });
+
+      if (!response.ok) {
+        throw new Error('댓글을 불러오지 못했습니다.');
       }
+
+      const data = await response.json();
+      return Array.isArray(data.comments) ? data.comments : [];
     }
 
-    function saveComments(comments) {
-      localStorage.setItem(commentsStorageKey, JSON.stringify(comments));
+    async function createComment(nickname, text) {
+      const response = await fetch(commentsApiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json'
+        },
+        body: JSON.stringify({ nickname, text })
+      });
+
+      if (!response.ok) {
+        throw new Error('댓글 등록에 실패했습니다.');
+      }
+
+      const data = await response.json();
+      return Array.isArray(data.comments) ? data.comments : [];
     }
 
-    function renderComments() {
-      const comments = loadComments();
+    function renderCommentList(comments) {
 
       if (comments.length === 0) {
         commentList.innerHTML = '<p class="empty-comments">아직 댓글이 없어요. 첫 댓글을 남겨보세요.</p>';
@@ -804,6 +823,16 @@
           <p class="comment-text">${escapeHtml(comment.text)}</p>
         </article>
       `).join('');
+    }
+
+    async function renderComments() {
+      commentList.innerHTML = '<p class="empty-comments">댓글을 불러오는 중이에요.</p>';
+
+      try {
+        renderCommentList(await loadComments());
+      } catch (error) {
+        commentList.innerHTML = '<p class="empty-comments">공용 댓글 저장소 연결을 확인해주세요.</p>';
+      }
     }
 
     function escapeHtml(value) {
@@ -854,7 +883,7 @@
     instagramButton.addEventListener('click', shareInstagram);
     kakaoButton.addEventListener('click', shareKakao);
 
-    commentForm.addEventListener('submit', (event) => {
+    commentForm.addEventListener('submit', async (event) => {
       event.preventDefault();
 
       const nickname = nicknameInput.value.trim();
@@ -865,32 +894,18 @@
         return;
       }
 
-      const comments = loadComments();
-      comments.unshift({
-        nickname,
-        text,
-        date: new Date().toLocaleString('ko-KR', {
-          month: '2-digit',
-          day: '2-digit',
-          hour: '2-digit',
-          minute: '2-digit'
-        })
-      });
-
-      saveComments(comments);
-      commentInput.value = '';
-      renderComments();
-      showToast('댓글이 등록됐어요.');
+      try {
+        renderCommentList(await createComment(nickname, text));
+        commentInput.value = '';
+        showToast('댓글이 등록됐어요.');
+      } catch (error) {
+        showToast('댓글 저장소 연결을 확인해주세요.');
+      }
     });
 
-    clearCommentsButton.addEventListener('click', () => {
-      if (!confirm('저장된 댓글을 모두 지울까요?')) {
-        return;
-      }
-
-      saveComments([]);
+    refreshCommentsButton.addEventListener('click', () => {
       renderComments();
-      showToast('댓글을 모두 지웠어요.');
+      showToast('댓글을 새로 불러왔어요.');
     });
 
     renderComments();
