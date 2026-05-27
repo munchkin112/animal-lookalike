@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import html2canvas from 'html2canvas';
 import './styles.css';
 
 const KAKAO_APP_KEY = '975b1ff2408619d2ea5ba1e0734f720e';
@@ -7,6 +8,32 @@ const SERVICE_URL = 'https://munchking.pages.dev/';
 const COMMENTS_API_URL = '/api/comments';
 const ANIMALS = ['강아지상', '고양이상', '여우상', '토끼상', '곰상', '사슴상'];
 const MAX_KAKAO_IMAGE_SIZE = 5 * 1024 * 1024;
+const ANIMAL_META = {
+  강아지상: {
+    emoji: '🐶',
+    description: '밝고 친근한 첫인상이 매력적인 타입'
+  },
+  고양이상: {
+    emoji: '🐱',
+    description: '도도하고 세련된 분위기가 돋보이는 타입'
+  },
+  여우상: {
+    emoji: '🦊',
+    description: '눈빛과 분위기가 매력적인 타입'
+  },
+  토끼상: {
+    emoji: '🐰',
+    description: '부드럽고 사랑스러운 이미지의 타입'
+  },
+  곰상: {
+    emoji: '🐻',
+    description: '편안하고 든든한 인상을 주는 타입'
+  },
+  사슴상: {
+    emoji: '🦌',
+    description: '맑고 차분한 분위기를 가진 타입'
+  }
+};
 
 function createRandomResult() {
   const scores = ANIMALS.map((animal) => ({
@@ -84,6 +111,7 @@ async function createComment(nickname, text) {
 
 function App() {
   const fileInputRef = useRef(null);
+  const resultCardRef = useRef(null);
   const toastTimerRef = useRef(null);
   const [selectedImageFile, setSelectedImageFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -93,6 +121,7 @@ function App() {
   const [commentsStatus, setCommentsStatus] = useState('loading');
   const [nickname, setNickname] = useState('');
   const [commentText, setCommentText] = useState('');
+  const [isSavingImage, setIsSavingImage] = useState(false);
   const [toast, setToast] = useState('');
 
   const hasResult = Boolean(result);
@@ -268,6 +297,39 @@ function App() {
     showToast('카카오 키가 없어 결과 복사로 대신했어요.');
   };
 
+  const handleSaveResultImage = async () => {
+    if (!result || !resultCardRef.current || isSavingImage) {
+      return;
+    }
+
+    setIsSavingImage(true);
+
+    try {
+      await document.fonts?.ready;
+      const canvas = await html2canvas(resultCardRef.current, {
+        backgroundColor: '#111318',
+        scale: 1,
+        useCORS: true,
+        width: 1080,
+        height: 1920,
+        windowWidth: 1080,
+        windowHeight: 1920
+      });
+      const imageUrl = canvas.toDataURL('image/png');
+      const link = document.createElement('a');
+      link.href = imageUrl;
+      link.download = 'animal-face-result.png';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showToast('결과 이미지가 저장되었어요. 인스타 스토리나 카카오톡에 공유해보세요.');
+    } catch (error) {
+      showToast('이미지 저장에 실패했어요. 다시 시도해주세요.');
+    } finally {
+      setIsSavingImage(false);
+    }
+  };
+
   const handleCommentSubmit = async (event) => {
     event.preventDefault();
     const trimmedNickname = nickname.trim();
@@ -323,6 +385,8 @@ function App() {
 
           <ShareSection
             disabled={!hasResult}
+            isSavingImage={isSavingImage}
+            onSaveImage={handleSaveResultImage}
             onCopy={handleCopy}
             onInstagram={handleInstagramShare}
             onKakao={handleKakaoShare}
@@ -340,6 +404,7 @@ function App() {
           />
         </div>
       </div>
+      <ResultImageCard ref={resultCardRef} result={result} topResult={topResult} />
       <Toast message={toast} />
     </main>
   );
@@ -438,10 +503,18 @@ function ResultSection({ result, topResult }) {
   );
 }
 
-function ShareSection({ disabled, onCopy, onInstagram, onKakao }) {
+function ShareSection({ disabled, isSavingImage, onSaveImage, onCopy, onInstagram, onKakao }) {
   return (
     <section className="section" aria-labelledby="shareTitle">
       <SectionTitle id="shareTitle" title="공유하기" hint="결과 생성 후 사용 가능" />
+      <button
+        className="btn btn-save-image"
+        type="button"
+        disabled={disabled || isSavingImage}
+        onClick={onSaveImage}
+      >
+        {isSavingImage ? '이미지 생성 중...' : '결과 이미지 저장'}
+      </button>
       <div className="share-grid">
         <button className="btn btn-secondary" type="button" disabled={disabled} onClick={onCopy}>결과 복사</button>
         <button className="btn btn-pink" type="button" disabled={disabled} onClick={onInstagram}>인스타그램 DM</button>
@@ -450,6 +523,49 @@ function ShareSection({ disabled, onCopy, onInstagram, onKakao }) {
     </section>
   );
 }
+
+const ResultImageCard = React.forwardRef(function ResultImageCard({ result, topResult }, ref) {
+  const meta = topResult ? ANIMAL_META[topResult.animal] : null;
+  const origin = typeof window !== 'undefined' ? window.location.origin : SERVICE_URL;
+
+  return (
+    <div className="result-card-capture-wrap" aria-hidden="true">
+      <div className="result-image-card" ref={ref}>
+        {topResult && meta && result && (
+          <>
+            <div className="capture-bg-glow capture-bg-glow-one" />
+            <div className="capture-bg-glow capture-bg-glow-two" />
+            <div className="capture-content">
+              <div className="capture-label">재미로 보는 동물상 테스트</div>
+              <div className="capture-emoji">{meta.emoji}</div>
+              <h3>나는 {topResult.animal} {topResult.percent}%</h3>
+              <p className="capture-description">{meta.description}</p>
+
+              <div className="capture-result-list">
+                {result.map((item) => (
+                  <div className="capture-result-row" key={item.animal}>
+                    <div className="capture-result-label">
+                      <span>{item.animal}</span>
+                      <strong>{item.percent}%</strong>
+                    </div>
+                    <div className="capture-bar">
+                      <div className="capture-bar-fill" style={{ width: `${item.percent}%` }} />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="capture-footer">
+                <strong>너도 테스트해보기</strong>
+                <span>{origin}</span>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+});
 
 function CommentSection({
   comments,
